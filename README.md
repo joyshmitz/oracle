@@ -1,95 +1,74 @@
 # oracle
 
-Oracle is a command-line helper for GPT-5 Pro / GPT-5.1 when you have one really hard question that needs smart reasoning *and* lots of local context. Pass a prompt plus any relevant files or directories (source code, logs, docs), and Oracle bundles everything into a single Responses API call. GPT-5 works best when you attach the files that explain the issue—just keep the total under the ~196k-token window. Enabling the platform `web_search` tool lets GPT-5 cite up-to-date information before replying.
+Oracle is a one-shot CLI for GPT-5 Pro / GPT-5.1 when you need deep reasoning plus lots of local context. Point it at your prompt and the relevant files (code, logs, docs); Oracle bundles everything into the Responses API, keeps the run alive in the background, and records a searchable transcript.
 
-## Prerequisites
-
-- Node.js 20+
-- [pnpm](https://pnpm.io/) 8+
-- An OpenAI API key with access to GPT-5 Pro or GPT-5.1 (`OPENAI_API_KEY`)
-
-Copy `.env.example` to `.env` (or export the variable another way) and drop your key in:
-
-```bash
-cp .env.example .env
-```
-
-## Install & run
+## Quick start
 
 ```bash
 pnpm install
-pnpm start -- --prompt "Summarize the risk register" \
-  --file docs/risk-register.md docs/risk-matrix.md
-# or
-node ./bin/oracle-cli.js --prompt "Summarize the risk register" \
+OPENAI_API_KEY=sk-... pnpm run oracle -- \
+  --prompt "Summarize the risk register" \
   --file docs/risk-register.md docs/risk-matrix.md
 ```
 
-Use `pnpm oracle` if you prefer the alias. Always attach the files (or directories) that describe the bug or decision you want GPT-5 to reason about—just verify the combined token count with `--files-report` before sending the request.
+Prefer the compiled binary? `pnpm run build && node dist/bin/oracle.js --prompt ...` works too. Always attach the files/directories that explain the issue, then check `--files-report` to keep the combined token count within the ~196k window.
 
-## Features
+## Highlights
 
-- **Streaming responses** from GPT-5 Pro or GPT-5.1 (high reasoning) via the Responses API.
-- **Built-in web search tool** is always enabled so answers can cite fresh info without extra flags.
-- **File attachments** with Markdown wrapping plus `--files-report` to see token impact per file.
-- **Preflight checks**: GPT-tokenizer ensures prompts stay within the configured input budget and shows per-file breakdown when you exceed it.
-- **Preview mode** (`--preview`) prints the token counts without calling the API. Add `--preview-json` only when you really need the raw payload dump.
-- **Markdown render** (`--render-markdown`) emits the fully assembled prompt + file bundle using `[SYSTEM]`, `[USER]`, and `[FILE: path]` markers (no API call) so you can paste it straight into reviews or prompt guides.
-- **Detached sessions**: every real run happens in the background, survives terminal closures, and logs to `~/.oracle/sessions/<sessionId>` alongside usage stats and costs.
-- **Cost & usage summary** after every run (input/output/reasoning tokens, elapsed time, USD estimate) both on-screen and saved with the session.
+- **Streaming Responses API client** for GPT-5 Pro (default) or GPT-5.1 (auto high-reasoning effort).
+- **Web search tool** on by default so the model can cite fresh information.
+- **File attachments with Markdown wrapping** and per-file token accounting via `--files-report`.
+- **Preview & render modes** (`--preview`, `--render-markdown`) help inspect the assembled bundle before spending API credits.
+- **Detached sessions + disk logs** under `~/.oracle/sessions/<slug>` with cost + usage metadata.
+- **Browser mode** (`--browser`) automates ChatGPT in Chrome, mirroring the same session/usage tracking when you need the consumer UI instead of the API.
+- **Advanced flags on demand** – run `oracle --help --verbose` (or `oracle --debug-help`) to reveal the less common search/token/browser toggles without cluttering the primary help output.
 
-## CLI flags
+## Everyday flags
 
 | Flag | Description |
-| --- | --- |
-| `-p, --prompt <text>` | **Required for new runs/preview.** User message that kicks off the request. |
-| `-f, --file <path>` | Attach one or more files or directories (repeat the flag or pass a space separated list). Directories are scanned recursively and each file is embedded under a Markdown heading. |
-| `-m, --model <name>` | Choose `gpt-5-pro` (default) or `gpt-5.1`. The latter automatically sets `reasoning.effort` to `high`. |
-| `--slug <words>` | Provide a custom 3–5 word slug so session IDs stay memorable (`release-risk-review`, etc.). Duplicates get `-2`, `-3`, … |
-| `--files-report` | Print a sorted table of attached files with their token counts and percentage of the input budget (auto-enabled when files exceed the budget). |
-| `--preview` | Print the token budget summary and exit before hitting the API. |
-| `--preview-json` | When combined with `--preview`, also dump the full JSON payload (otherwise only the summary/tokens print). |
-| `--render-markdown` | Emit the assembled markdown for system prompt, user prompt, and attached files (no API call). |
+| ---- | ----------- |
+| `-p, --prompt <text>` | **Required** for new runs/preview. User instruction sent to GPT-5. |
+| `-f, --file <paths...>` | Attach files or directories (repeat flag or use space/comma lists). Directories expand recursively. |
+| `-m, --model <name>` | `gpt-5-pro` (default) or `gpt-5.1` (high reasoning mode). |
+| `-s, --slug <words>` | Force a memorable 3–5 word session slug (`release-risk-review`). Duplicates get `-2`, `-3`, ... |
+| `--files-report` | Show per-file token usage (auto-enabled when you exceed the token budget). |
+| `--preview [mode]` | Inspect token counts (and optionally JSON/markdown) without hitting the API. |
+| `--render-markdown` | Print the `[SYSTEM]`, `[USER]`, `[FILE: ...]` bundle to stdout (no API call). |
+| `--browser` | Route the run through the ChatGPT web UI (see *Browser mode* below). |
+| `-v, --verbose` | Emit verbose logs (and, when paired with `--help`, list the advanced option set). |
 
-Every run ends with a stats block showing elapsed time, actual/estimated tokens, reasoning tokens, and dollar cost (computed from the official per-token rates for each model).
+Need search toggles, token overrides, or Chrome tweaks? `oracle --help --verbose` lists the advanced/debug-only flags, and `oracle --debug-help` prints the same summary without the rest of the help text.
+
+## Browser mode in a nutshell
+
+`oracle --browser ...` launches a temporary Chrome profile, optionally copies cookies from your main browser, pastes the assembled `[SYSTEM]/[USER]/[FILE]` bundle into ChatGPT, waits for the answer, and logs the output just like an API run. Key points:
+
+- Same session workflow (`oracle status`, `oracle session <id>`) with extra metadata (Chrome PID/port/profile dir).
+- No streaming output (ChatGPT returns a full answer once the copy button fires).
+- Hidden flags control headless mode, timeouts, cookie sync, etc. View them via `oracle --debug-help` or `docs/browser-mode.md`.
+
+## Sessions & background execution
+
+Every non-preview run spawns a detached worker and logs to `~/.oracle/sessions/<slug>`. You can:
+
+- `oracle session <sessionId>` – replay and follow a specific session.
+- `oracle session` / `oracle status` – list recent runs (24 h window by default; tweak with `--hours/--limit/--all`).
+- `oracle status clear --hours 168` – prune logs older than a week (or `--all` for a full reset).
+
+Set `ORACLE_HOME_DIR` if you want to store logs somewhere other than your home directory.
 
 ## How it works
 
-1. Gathers the base prompt plus any referenced files. Files are resolved relative to the current working directory and embedded verbatim under markdown headings so GPT-5 gets clear provenance.
-2. Uses `gpt-tokenizer`’s GPT-5/GPT-5 Pro encoders to count tokens for the synthetic system/user chat. If the estimate exceeds the configured budget (default 196,000 tokens for GPT-5 Thinking/Pro in the API), the CLI fails fast before hitting the network.
-3. Sends a single `responses.create` call with your prompt, the optional `web_search_preview` tool, and (for GPT-5.1) `reasoning.effort = high`.
-4. Streams the textual answer to stdout as soon as the API emits deltas, then prints run metadata including elapsed wall-clock time, API-reported usage numbers, and the computed USD cost. Cost is derived from OpenAI’s stated $1.25 / $10 per 1M token rate for GPT-5 and $15 / $120 per 1M tokens for GPT-5 Pro.
-
-## Notes
-
-- Responses stream by default so you can watch GPT-5 think. Capture stdout if you need to store the transcript.
-- Use `--preview` to inspect the final instructions + input text (including attached files) and verify token counts without spending API credits.
-- Use `--files-report` (or attach files that exceed the input token budget) to see a descending summary of per-file token usage so you know what to trim.
-- Directory paths expand recursively; consider pairing with `--files-report` to understand token impact before sending extremely large trees.
-- Attachments are treated as plain UTF-8; binary files will throw. Keep extremely large files out of the prompt to avoid blowing the token budget.
-- Each invocation is stored as a session under `~/.oracle/sessions`; script multi-turn flows by feeding prior session outputs back through `--file`.
-- `pnpm lint` runs type-checking plus Biome so the shipped JS stays syntax-valid.
-
-## Sessions & Background Execution
-
-Oracle writes every non-preview run to `~/.oracle/sessions/<slug>` (add `--slug "release-risk-review"` to pick your own 3–5 word slug) and spawns a detached Bun process so the request keeps streaming even if the originating shell exits. If a slug already exists, Oracle appends `-2`, `-3`, and so on to keep directories unique.
-
-Commands:
-
-- `oracle session <sessionId>` – attach to a running/completed session, replay the log, and follow new output if the request is still alive. Run `oracle session` with no ID to list recent sessions (same as `oracle status`).
-- `oracle status [--hours <n>] [--limit <n>] [--all]` – list recent sessions (default 24 hours, capped at 1,000 entries). Increase the window or limit as needed.
-
-Typical workflow:
-
-1. Kick off a run: `pnpm start -- --prompt "Fix the bug" --file src/app.ts`. The CLI immediately returns with the Session ID and the background worker carries on.
-2. Tail it later: `oracle session <sessionId>` replays the transcript from disk and follows new output until the run finishes.
-3. Check recent work: `oracle status --hours 72 --limit 50` lists the last 72 hours of sessions (cap 50 entries). Add `--all` to include every stored session. If you accumulate more than 1,000, delete old folders inside `~/.oracle/sessions`.
-4. Need a different storage path? Set `ORACLE_HOME_DIR=/custom/cache` before running the CLI.
+1. Collects the prompt + files, converts them into markdown sections (`### File n: path`), and counts tokens using the GPT-5/GPT-5 Pro encoders.
+2. Fails fast if the estimated input exceeds the per-model budget (default 196k) and prints per-file breakdowns when needed.
+3. Sends a single Responses API request with the system prompt, user prompt, files, and optional search tool—or, in browser mode, drives the ChatGPT UI with Chrome DevTools.
+4. Streams output (API runs) or prints the captured markdown (browser runs), then records elapsed time, usage numbers, and cost estimates.
 
 ## Testing
 
 ```bash
-pnpm test
+pnpm test        # Vitest unit/integration suite (no network)
+pnpm test:coverage
 ```
 
-The Vitest suite covers prompt building with attachments, preview mode, token budget enforcement, and the stats/cost output without touching the OpenAI API. Run `pnpm test:coverage` for V8 coverage reports.
+Tests cover prompt assembly, preview/token enforcement, CLI session plumbing, and the browser helper modules.

@@ -224,6 +224,11 @@ function getBrowserConfigFromMetadata(metadata: SessionMetadata): BrowserSession
 async function runRootCommand(options: CliOptions): Promise<void> {
   const helpRequested = rawCliArgs.some((arg: string) => arg === '--help' || arg === '-h');
   if (helpRequested) {
+    if (options.verbose) {
+      console.log('');
+      printDebugHelp(program.name());
+      console.log('');
+    }
     program.help({ error: false });
     return;
   }
