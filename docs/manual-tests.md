@@ -88,6 +88,30 @@ This mirrors Mario Zechner’s “What if you don’t need MCP?” technique and
 
 Document results (pass/fail, session IDs) in PR descriptions so reviewers can audit real-world behavior.
 
+## Browser Regression Checklist (manual)
+
+Run these four smoke tests whenever we touch browser automation:
+
+1. **GPT-5.1 simple prompt**  
+   `pnpm run oracle -- --engine browser --model "5.1 Instant" --prompt "Give me two short markdown bullet points about tables"`  
+   Expect two markdown bullets, no files/search referenced. Note the session ID (e.g., `give-me-two-short-markdown`).
+
+2. **GPT-5 Pro simple prompt**  
+   `pnpm run oracle -- --engine browser --model gpt-5-pro --prompt "List two reasons Markdown is handy"`  
+   Confirm the answer arrives (and only once) even if it takes ~2–3 minutes; heartbeat lines should show up while waiting.
+
+3. **GPT-5.1 + attachment**  
+   Prepare `/tmp/browser-md.txt` with a short note, then run  
+   `pnpm run oracle -- --engine browser --model "5.1 Instant" --prompt "Summarize the key idea from the attached note" --file /tmp/browser-md.txt`  
+   Ensure upload logs show “Attachment queued” and the answer references the file contents explicitly.
+
+4. **GPT-5 Pro + attachment**  
+   Prepare `/tmp/browser-report.txt` with faux metrics, then run  
+   `pnpm run oracle -- --engine browser --model gpt-5-pro --prompt "Use the attachment to report current CPU and memory figures" --file /tmp/browser-report.txt --verbose`  
+   Verify verbose logs show attachment upload and the final answer matches the file data.
+
+Record session IDs and outcomes in the PR description (pass/fail, notable delays). This ensures reviewers can audit real runs.
+
 ## Chrome DevTools / MCP Debugging
 
 Use this when you need to inspect the live ChatGPT composer (DOM state, markdown text, screenshots, etc.). For smaller ad‑hoc pokes, you can often rely on `pnpm tsx scripts/browser-tools.ts …` instead.
