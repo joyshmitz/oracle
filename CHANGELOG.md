@@ -8,3 +8,4 @@
 - **Transport metadata logging** – CLI now records transport errors and response metadata in session logs to make flaky network/API issues easier to diagnose.
 - **Browser helper modules + tests** – Split the browser automation stack into focused modules (`chromeLifecycle`, `cookies`, `pageActions`, `prompt`, `sessionRunner`, etc.) with targeted tests.
 - **Browser mode refactor** – Deprecated the monolithic `browserMode.ts` file in favor of the modular implementation, improving readability and maintainability.
+- **Browser tools mirror** – Copied `scripts/browser-tools.ts` into `~/Projects/agent-scripts/` so the chrome start/nav/eval/kill helpers are available to other repos without importing Oracle. Credited Mario Zechner’s [“What if you don’t need MCP?”](https://mariozechner.at/posts/2025-11-02-what-if-you-dont-need-mcp/) article for inspiring the workflow.

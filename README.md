@@ -57,6 +57,16 @@ Need search toggles, token overrides, or Chrome tweaks? `oracle --help --verbose
 - No streaming output (ChatGPT returns a full answer once the copy button fires).
 - Hidden flags control headless mode, timeouts, cookie sync, etc. View them via `oracle --debug-help` or `docs/browser-mode.md`.
 
+### Browser helper CLI
+
+Need a quick manual poke without launching a full session? The same
+`scripts/browser-tools.ts` utility is mirrored to
+`~/Projects/agent-scripts/browser-tools.ts` so you can run `pnpm tsx` from that
+shared toolbox outside the Oracle repo (handy when another project needs the
+inspector/kill helpers). The workflow borrows heavily from Mario Zechner’s
+“[What if you don’t need MCP?](https://mariozechner.at/posts/2025-11-02-what-if-you-dont-need-mcp/)” write-up—thanks for
+the inspiration!
+
 ## Sessions & background execution
 
 Every non-preview run spawns a detached worker and logs to `~/.oracle/sessions/<slug>`. You can:
