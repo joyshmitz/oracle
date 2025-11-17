@@ -42,6 +42,10 @@ export async function ensureModelSelection(
   }
 }
 
+/**
+ * Builds the DOM expression that runs inside the ChatGPT tab to select a model.
+ * The string is evaluated inside Chrome, so keep it self-contained and well-commented.
+ */
 function buildModelSelectionExpression(targetModel: string): string {
   const matchers = buildModelMatchersLiteral(targetModel);
   const labelLiteral = JSON.stringify(matchers.labelTokens);
@@ -50,6 +54,7 @@ function buildModelSelectionExpression(targetModel: string): string {
   const menuContainerLiteral = JSON.stringify(MENU_CONTAINER_SELECTOR);
   const menuItemLiteral = JSON.stringify(MENU_ITEM_SELECTOR);
   return `(() => {
+    // Capture the selectors and matcher literals up front so the browser expression stays pure.
     const BUTTON_SELECTOR = '${MODEL_BUTTON_SELECTOR}';
     const LABEL_TOKENS = ${labelLiteral};
     const TEST_IDS = ${idLiteral};
@@ -66,6 +71,7 @@ function buildModelSelectionExpression(targetModel: string): string {
         .replace(/\\s+/g, ' ')
         .trim();
     };
+    // Normalize every candidate token to keep fuzzy matching deterministic.
     const normalizedTarget = normalizeText(PRIMARY_LABEL);
     const normalizedTokens = Array.from(new Set([normalizedTarget, ...LABEL_TOKENS]))
       .map((token) => normalizeText(token))
@@ -79,6 +85,7 @@ function buildModelSelectionExpression(targetModel: string): string {
 
     let lastPointerClick = 0;
     const pointerClick = () => {
+      // Some menus ignore synthetic click events.
       const down = new PointerEvent('pointerdown', { bubbles: true, pointerId: 1, pointerType: 'mouse' });
       const up = new PointerEvent('pointerup', { bubbles: true, pointerId: 1, pointerType: 'mouse' });
       const click = new MouseEvent('click', { bubbles: true });
@@ -112,6 +119,7 @@ function buildModelSelectionExpression(targetModel: string): string {
     };
 
     const scoreOption = (normalizedText, testid) => {
+      // Assign a score to every node so we can pick the most likely match without brittle equality checks.
       if (!normalizedText && !testid) {
         return 0;
       }
@@ -130,6 +138,7 @@ function buildModelSelectionExpression(targetModel: string): string {
         }
       }
       for (const token of normalizedTokens) {
+        // Reward partial matches to the expanded label/token set.
         if (token && normalizedText.includes(token)) {
           const tokenWeight = Math.min(120, Math.max(10, token.length * 4));
           score += tokenWeight;
@@ -148,6 +157,7 @@ function buildModelSelectionExpression(targetModel: string): string {
     };
 
     const findBestOption = () => {
+      // Walk through every menu item and keep whichever earns the highest score.
       let bestMatch = null;
       const menus = Array.from(document.querySelectorAll(${menuContainerLiteral}));
       for (const menu of menus) {
@@ -252,4 +262,8 @@ function buildModelMatchersLiteral(targetModel: string): { labelTokens: string[]
     labelTokens: Array.from(labelTokens).filter(Boolean),
     testIdTokens: Array.from(testIdTokens).filter(Boolean),
   };
+}
+
+export function buildModelSelectionExpressionForTest(targetModel: string): string {
+  return buildModelSelectionExpression(targetModel);
 }
