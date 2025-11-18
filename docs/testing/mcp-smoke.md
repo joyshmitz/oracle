@@ -1,14 +1,31 @@
 # MCP Smoke Tests (local oracle-mcp)
 
-Use these steps to validate the MCP stdio server before releasing.
+Use these steps to validate CLI + MCP end-to-end before releasing.
 
-Prereqs
+## Checklist (run all four lanes)
+1) CLI (API engine)
+2) CLI (browser engine)
+3) MCP via mcporter (API + browser)
+4) Claude Code via MCP (API defaults)
+
+Shared prereqs
 - `pnpm build` (ensures `dist/bin/oracle-mcp.js` exists)
 - `OPENAI_API_KEY` set in env
-- `config/mcporter.json` contains the `oracle-local` entry pointing to `node ../dist/bin/oracle-mcp.js` (already committed)
+- `config/mcporter.json` contains the `oracle-local` entry pointing to `node ../dist/bin/oracle-mcp.js` (already committed).
 - mcporter available at `/Users/steipete/Library/pnpm/global/5/node_modules/.bin/mcporter`
+- For browser runs: Chrome installed; macOS host (headful).
 
-Commands
+## CLI smokes
+- API:
+  ```bash
+  pnpm run oracle -- --engine api --model gpt-5.1 --prompt "API smoke: say two words"
+  ```
+- Browser:
+  ```bash
+  pnpm run oracle -- --engine browser --model "5.1 Instant" --prompt "Browser smoke: say two words"
+  ```
+
+## MCP via mcporter
 1) List tools/schema to confirm discovery:
    ```bash
    mcporter list oracle-local --schema --config config/mcporter.json
