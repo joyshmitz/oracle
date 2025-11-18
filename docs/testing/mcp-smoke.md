@@ -11,7 +11,7 @@ Use these steps to validate CLI + MCP end-to-end before releasing.
 Shared prereqs
 - `pnpm build` (ensures `dist/bin/oracle-mcp.js` exists)
 - `OPENAI_API_KEY` set in env
-- `config/mcporter.json` contains the `oracle-local` entry pointing to `npx -y @steipete/oracle oracle-mcp` (already committed).
+- `config/mcporter.json` contains the `oracle-mcp` entry pointing to `npx -y @steipete/oracle oracle-mcp` (already committed).
 - mcporter available at `/Users/steipete/Library/pnpm/global/5/node_modules/.bin/mcporter`
 - For browser runs: Chrome installed; macOS host (headful).
 - macOS notifications: `vendor/oracle-notifier/OracleNotifier.app` ships with the package (preferred); falls back to toasted-notifier if missing/broken.
@@ -29,12 +29,12 @@ Shared prereqs
 ## MCP via mcporter
 1) List tools/schema to confirm discovery:
    ```bash
-   mcporter list oracle-local --schema --config config/mcporter.json
+   mcporter list oracle-mcp --schema --config config/mcporter.json
    ```
 
 2) API consult (GPT-5.1):
    ```bash
-   mcporter call oracle-local.consult \
+   mcporter call oracle-mcp.consult \
      prompt:"Say hello from GPT-5.1" \
      model:"gpt-5.1" \
      engine:"api" \
@@ -43,17 +43,17 @@ Shared prereqs
 
 3) Sessions list:
    ```bash
-   mcporter call oracle-local.sessions hours:12 limit:3 --config config/mcporter.json
+   mcporter call oracle-mcp.sessions hours:12 limit:3 --config config/mcporter.json
    ```
 
 4) Session detail:
    ```bash
-   mcporter call oracle-local.sessions id:"say-hello-from-gpt-5" detail:true --config config/mcporter.json
+   mcporter call oracle-mcp.sessions id:"say-hello-from-gpt-5" detail:true --config config/mcporter.json
    ```
 
 5) Browser smoke:
    ```bash
-   mcporter call oracle-local.consult \
+   mcporter call oracle-mcp.consult \
      prompt:"Browser smoke" \
      model:"5.1 Instant" \
      engine:"browser" \

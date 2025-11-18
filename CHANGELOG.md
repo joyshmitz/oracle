@@ -27,7 +27,7 @@ All notable changes to this project will be documented in this file.
 - Local stdio (mcporter): add to `config/mcporter.json`
   ```json
   {
-    "name": "oracle-local",
+    "name": "oracle-mcp",
     "type": "stdio",
     "command": "npx",
     "args": ["-y", "@steipete/oracle", "oracle-mcp"]

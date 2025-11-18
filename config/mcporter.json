@@ -31,7 +31,7 @@
     "iterm": {
       "command": "/Users/steipete/Projects/iterm-mcp/build/index.js"
     },
-    "oracle-local": {
+    "oracle-mcp": {
       "command": "npx",
       "args": [
         "-y",
