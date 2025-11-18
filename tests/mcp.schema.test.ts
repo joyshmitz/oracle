@@ -23,7 +23,7 @@ describe('oracle-mcp schemas', () => {
   });
 
   it('exposes object schemas for tools', async () => {
-    const { tools } = await client.listTools({ server: {} }, { timeoutMs: 10_000 });
+    const { tools } = await client.listTools({}, { timeout: 10_000 });
     expect(tools.length).toBeGreaterThan(0);
     for (const tool of tools) {
       for (const schema of [tool.inputSchema, tool.outputSchema]) {

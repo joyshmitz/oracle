@@ -43,4 +43,26 @@ Commands
    ```
    Uses a built-in browserConfig (ChatGPT URL + cookie sync) and the provided model label for the picker (heads-up: if the ChatGPT UI renames the model label, this may need an update).
 
+## Claude Code smoke (tmux + cli)
+
+Use this to verify Claude Code can reach the Oracle MCP server end-to-end.
+
+Prereqs
+- `pnpm build`
+- `OPENAI_API_KEY` exported (for the API engine default)
+- Oracle MCP registered with Claude (once per project):  
+  `claude mcp add --transport stdio oracle -- oracle-mcp`
+
+Steps
+1) Start Claude in tmux:
+   ```bash
+   tmux new -s claude-smoke 'cd /Users/steipete/Projects/oracle && OPENAI_API_KEY=$OPENAI_API_KEY claude --permission-mode bypassPermissions --mcp-config ~/.mcp/oracle.json'
+   ```
+2) From another shell, use the helper to drive it:
+   ```bash
+   bun scripts/agent-send.ts --session claude-smoke --wait-ms 800 --entry double -- \
+     'Call the oracle sessions MCP tool with {"limit":1,"detail":true} and show the result'
+   ```
+3) Validate the pane shows a successful `oracle sessions` tool call (or adjust `--mcp-config` if it reports no tools). When finished, `tmux kill-session -t claude-smoke`.
+
 See `docs/mcp.md` for full tool/resource schemas and behavior.

@@ -12,6 +12,7 @@ import {
 import { performSessionRun } from '../../cli/sessionRunner.js';
 import { CHATGPT_URL } from '../../browser/constants.js';
 import { consultInputSchema } from '../types.js';
+import { loadUserConfig } from '../../config.js';
 
 // Use raw shapes so the MCP SDK (with its bundled Zod) wraps them and emits valid JSON Schema.
 const consultInputShape = {
@@ -43,7 +44,15 @@ export function registerConsultTool(server: McpServer): void {
     async (input: unknown) => {
       const textContent = (text: string) => [{ type: 'text' as const, text }];
       const { prompt, files, model, engine, slug } = consultInputSchema.parse(input);
-      const { runOptions, resolvedEngine } = mapConsultToRunOptions({ prompt, files: files ?? [], model, engine });
+      const { config: userConfig } = await loadUserConfig();
+      const { runOptions, resolvedEngine } = mapConsultToRunOptions({
+        prompt,
+        files: files ?? [],
+        model,
+        engine,
+        userConfig,
+        env: process.env,
+      });
       const cwd = process.cwd();
 
       const browserGuard = ensureBrowserAvailable(resolvedEngine);
