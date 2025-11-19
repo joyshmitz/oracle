@@ -166,7 +166,6 @@ export async function performSessionRun({
       log(dim('Browser fallback:')); // guides users when automation breaks
       log(dim('- Use --engine api to run the same prompt without Chrome.'));
       log(dim('- Add --browser-bundle-files to bundle attachments into a single text file you can drag into ChatGPT.'));
-      log(dim('- If cookies are the issue, rerun with --browser-inline-cookies[(-file)] or --browser-no-cookie-sync.'));
     }
     throw error;
   }
