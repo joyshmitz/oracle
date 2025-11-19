@@ -46,7 +46,7 @@ describe('oracle CLI integration', () => {
     const sessionsDir = path.join(oracleHome, 'sessions');
     const sessionIds = await readdir(sessionsDir);
     expect(sessionIds.length).toBe(1);
-    const metadataPath = path.join(sessionsDir, sessionIds[0], 'session.json');
+    const metadataPath = path.join(sessionsDir, sessionIds[0], 'meta.json');
     const metadata = JSON.parse(await readFile(metadataPath, 'utf8'));
     expect(metadata.status).toBe('completed');
     expect(metadata.response?.requestId).toBe('mock-req');

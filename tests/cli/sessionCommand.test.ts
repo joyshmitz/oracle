@@ -86,7 +86,7 @@ describe('handleSessionCommand', () => {
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
     const getSessionPaths = vi.fn().mockResolvedValue({
       dir: '/tmp/.oracle/sessions/abc',
-      metadata: '/tmp/.oracle/sessions/abc/session.json',
+      metadata: '/tmp/.oracle/sessions/abc/meta.json',
       request: '/tmp/.oracle/sessions/abc/request.json',
       log: '/tmp/.oracle/sessions/abc/output.log',
     });
@@ -101,7 +101,7 @@ describe('handleSessionCommand', () => {
 
     expect(getSessionPaths).toHaveBeenCalledWith('abc');
     expect(logSpy).toHaveBeenCalledWith('Session dir: /tmp/.oracle/sessions/abc');
-    expect(logSpy).toHaveBeenCalledWith('Metadata: /tmp/.oracle/sessions/abc/session.json');
+    expect(logSpy).toHaveBeenCalledWith('Metadata: /tmp/.oracle/sessions/abc/meta.json');
     expect(logSpy).toHaveBeenCalledWith('Request: /tmp/.oracle/sessions/abc/request.json');
     expect(logSpy).toHaveBeenCalledWith('Log: /tmp/.oracle/sessions/abc/output.log');
     expect(process.exitCode).toBeUndefined();
@@ -126,7 +126,7 @@ describe('handleSessionCommand', () => {
   test('errors when session files are missing', async () => {
     const command = createCommandWithOptions({ hours: 24, limit: 10, all: false, path: true } as StatusOptions);
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    const getSessionPaths = vi.fn().mockRejectedValue(new Error('Session "abc" is missing: session.json'));
+    const getSessionPaths = vi.fn().mockRejectedValue(new Error('Session "abc" is missing: meta.json'));
 
     await handleSessionCommand('abc', command, {
       showStatus: vi.fn(),
@@ -136,7 +136,7 @@ describe('handleSessionCommand', () => {
       getSessionPaths,
     });
 
-    expect(errorSpy).toHaveBeenCalledWith('Session "abc" is missing: session.json');
+    expect(errorSpy).toHaveBeenCalledWith('Session "abc" is missing: meta.json');
     expect(process.exitCode).toBe(1);
   });
 

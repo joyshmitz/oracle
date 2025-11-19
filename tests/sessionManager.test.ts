@@ -72,10 +72,13 @@ describe('session lifecycle', () => {
     );
     vi.useRealTimers();
     const baseDir = path.join(sessionModule.SESSIONS_DIR, metadata.id);
-    const storedMeta = JSON.parse(await readFile(path.join(baseDir, 'session.json'), 'utf8'));
+    const storedMeta = JSON.parse(await readFile(path.join(baseDir, 'meta.json'), 'utf8'));
     expect(storedMeta.options.file).toEqual(['notes.md']);
-    const request = JSON.parse(await readFile(path.join(baseDir, 'request.json'), 'utf8'));
-    expect(request.prompt).toBe('Inspect code');
+    await expect(readFile(path.join(baseDir, 'request.json'), 'utf8')).rejects.toThrow();
+    const modelMeta = JSON.parse(await readFile(path.join(baseDir, 'models', 'gpt-5-pro.json'), 'utf8'));
+    expect(modelMeta.status).toBe('pending');
+    const perModelLog = await readFile(path.join(baseDir, 'models', 'gpt-5-pro.log'), 'utf8');
+    expect(perModelLog).toBe('');
     const logContent = await readFile(path.join(baseDir, 'output.log'), 'utf8');
     expect(logContent).toBe('');
   });

@@ -4,7 +4,7 @@ import fs from 'node:fs/promises';
 import { createWriteStream } from 'node:fs';
 import type { WriteStream } from 'node:fs';
 import type { CookieParam } from './browser/types.js';
-import type { TransportFailureReason, AzureOptions } from './oracle.js';
+import type { TransportFailureReason, AzureOptions, ModelName } from './oracle.js';
 
 export type SessionMode = 'api' | 'browser';
 
@@ -58,6 +58,7 @@ export interface StoredRunOptions {
   prompt?: string;
   file?: string[];
   model?: string;
+  models?: ModelName[];
   maxInput?: number;
   system?: string;
   maxOutput?: number;
@@ -83,6 +84,7 @@ export interface SessionMetadata {
   status: string;
   promptPreview?: string;
   model?: string;
+  models?: SessionModelRun[];
   cwd?: string;
   options: StoredRunOptions;
   notifications?: SessionNotifications;
@@ -104,6 +106,30 @@ export interface SessionMetadata {
   error?: SessionUserErrorMetadata;
 }
 
+export type SessionStatus = 'pending' | 'running' | 'completed' | 'error' | 'cancelled';
+
+export interface SessionModelRun {
+  model: string;
+  status: SessionStatus;
+  queuedAt?: string;
+  startedAt?: string;
+  completedAt?: string;
+  usage?: {
+    inputTokens: number;
+    outputTokens: number;
+    reasoningTokens: number;
+    totalTokens: number;
+    cost?: number;
+  };
+  response?: SessionResponseMetadata;
+  transport?: SessionTransportMetadata;
+  error?: SessionUserErrorMetadata;
+  log?: {
+    path: string;
+    bytes?: number;
+  };
+}
+
 export interface SessionNotifications {
   enabled: boolean;
   sound: boolean;
@@ -123,6 +149,12 @@ interface InitializeSessionOptions extends StoredRunOptions {
 
 const ORACLE_HOME = process.env.ORACLE_HOME_DIR ?? path.join(os.homedir(), '.oracle');
 const SESSIONS_DIR = path.join(ORACLE_HOME, 'sessions');
+const METADATA_FILENAME = 'meta.json';
+const LEGACY_SESSION_FILENAME = 'session.json';
+const LEGACY_REQUEST_FILENAME = 'request.json';
+const MODELS_DIRNAME = 'models';
+const MODEL_JSON_EXTENSION = '.json';
+const MODEL_LOG_EXTENSION = '.log';
 const MAX_STATUS_LIMIT = 1000;
 const ZOMBIE_MAX_AGE_MS = 60 * 60 * 1000; // 60 minutes
 const DEFAULT_SLUG = 'session';
@@ -169,15 +201,31 @@ function sessionDir(id: string): string {
 }
 
 function metaPath(id: string): string {
-  return path.join(sessionDir(id), 'session.json');
+  return path.join(sessionDir(id), METADATA_FILENAME);
+}
+
+function requestPath(id: string): string {
+  return path.join(sessionDir(id), LEGACY_REQUEST_FILENAME);
+}
+
+function legacySessionPath(id: string): string {
+  return path.join(sessionDir(id), LEGACY_SESSION_FILENAME);
 }
 
 function logPath(id: string): string {
   return path.join(sessionDir(id), 'output.log');
 }
 
-function requestPath(id: string): string {
-  return path.join(sessionDir(id), 'request.json');
+function modelsDir(id: string): string {
+  return path.join(sessionDir(id), MODELS_DIRNAME);
+}
+
+function modelJsonPath(id: string, model: string): string {
+  return path.join(modelsDir(id), `${model}${MODEL_JSON_EXTENSION}`);
+}
+
+function modelLogPath(id: string, model: string): string {
+  return path.join(modelsDir(id), `${model}${MODEL_LOG_EXTENSION}`);
 }
 
 async function fileExists(targetPath: string): Promise<boolean> {
@@ -199,6 +247,69 @@ async function ensureUniqueSessionId(baseSlug: string): Promise<string> {
   return candidate;
 }
 
+async function listModelRunFiles(sessionId: string): Promise<SessionModelRun[]> {
+  const dir = modelsDir(sessionId);
+  const entries = await fs.readdir(dir).catch(() => []);
+  const result: SessionModelRun[] = [];
+  for (const entry of entries) {
+    if (!entry.endsWith(MODEL_JSON_EXTENSION)) {
+      continue;
+    }
+    const jsonPath = path.join(dir, entry);
+    try {
+      const raw = await fs.readFile(jsonPath, 'utf8');
+      const parsed = JSON.parse(raw) as SessionModelRun;
+      const normalized = ensureModelLogReference(sessionId, parsed);
+      result.push(normalized);
+    } catch {
+      // ignore malformed model files
+    }
+  }
+  return result;
+}
+
+function ensureModelLogReference(sessionId: string, record: SessionModelRun): SessionModelRun {
+  const logPathRelative =
+    record.log?.path ?? path.relative(sessionDir(sessionId), modelLogPath(sessionId, record.model));
+  return {
+    ...record,
+    log: { path: logPathRelative, bytes: record.log?.bytes },
+  };
+}
+
+async function readModelRunFile(sessionId: string, model: string): Promise<SessionModelRun | null> {
+  try {
+    const raw = await fs.readFile(modelJsonPath(sessionId, model), 'utf8');
+    const parsed = JSON.parse(raw) as SessionModelRun;
+    return ensureModelLogReference(sessionId, parsed);
+  } catch {
+    return null;
+  }
+}
+
+export async function updateModelRunMetadata(
+  sessionId: string,
+  model: string,
+  updates: Partial<SessionModelRun>,
+): Promise<SessionModelRun> {
+  await ensureDir(modelsDir(sessionId));
+  const existing = (await readModelRunFile(sessionId, model)) ?? {
+    model,
+    status: 'pending',
+  };
+  const next: SessionModelRun = ensureModelLogReference(sessionId, {
+    ...existing,
+    ...updates,
+    model,
+  });
+  await fs.writeFile(modelJsonPath(sessionId, model), JSON.stringify(next, null, 2), 'utf8');
+  return next;
+}
+
+export async function readModelRunMetadata(sessionId: string, model: string): Promise<SessionModelRun | null> {
+  return readModelRunFile(sessionId, model);
+}
+
 export async function initializeSession(
   options: InitializeSessionOptions,
   cwd: string,
@@ -211,12 +322,23 @@ export async function initializeSession(
   await ensureDir(dir);
   const mode = options.mode ?? 'api';
   const browserConfig = options.browserConfig;
+  const modelList: ModelName[] =
+    Array.isArray(options.models) && options.models.length > 0
+      ? options.models
+      : options.model
+        ? [options.model as ModelName]
+        : [];
+
   const metadata: SessionMetadata = {
     id: sessionId,
     createdAt: new Date().toISOString(),
     status: 'pending',
     promptPreview: (options.prompt || '').slice(0, 160),
-    model: options.model,
+    model: modelList[0] ?? options.model,
+    models: modelList.map((modelName) => ({
+      model: modelName,
+      status: 'pending',
+    })),
     cwd,
     mode,
     browser: browserConfig ? { config: browserConfig } : undefined,
@@ -225,6 +347,7 @@ export async function initializeSession(
       prompt: options.prompt,
       file: options.file ?? [],
       model: options.model,
+      models: modelList,
       maxInput: options.maxInput,
       system: options.system,
       maxOutput: options.maxOutput,
@@ -243,34 +366,93 @@ export async function initializeSession(
       azure: options.azure,
     },
   };
+  await ensureDir(modelsDir(sessionId));
   await fs.writeFile(metaPath(sessionId), JSON.stringify(metadata, null, 2), 'utf8');
-  await fs.writeFile(requestPath(sessionId), JSON.stringify(metadata.options, null, 2), 'utf8');
+  await Promise.all(
+    (modelList.length > 0 ? modelList : [metadata.model ?? 'gpt-5-pro']).map(async (modelName) => {
+      const jsonPath = modelJsonPath(sessionId, modelName);
+      const logFilePath = modelLogPath(sessionId, modelName);
+      const modelRecord: SessionModelRun = {
+        model: modelName,
+        status: 'pending',
+        log: { path: path.relative(sessionDir(sessionId), logFilePath) },
+      };
+      await fs.writeFile(jsonPath, JSON.stringify(modelRecord, null, 2), 'utf8');
+      await fs.writeFile(logFilePath, '', 'utf8');
+    }),
+  );
   await fs.writeFile(logPath(sessionId), '', 'utf8');
   return metadata;
 }
 
 export async function readSessionMetadata(sessionId: string): Promise<SessionMetadata | null> {
-  try {
-    const raw = await fs.readFile(metaPath(sessionId), 'utf8');
-    const parsed = JSON.parse(raw) as SessionMetadata;
-    return await markZombie(parsed, { persist: false }); // transient check; do not touch disk on single read
-  } catch {
-    return null;
+  const modern = await readModernSessionMetadata(sessionId);
+  if (modern) {
+    return modern;
   }
+  const legacy = await readLegacySessionMetadata(sessionId);
+  if (legacy) {
+    return legacy;
+  }
+  return null;
 }
 
 export async function updateSessionMetadata(
   sessionId: string,
   updates: Partial<SessionMetadata>,
 ): Promise<SessionMetadata> {
-  const existing = (await readSessionMetadata(sessionId)) ?? ({ id: sessionId } as SessionMetadata);
+  const existing =
+    (await readModernSessionMetadata(sessionId)) ??
+    (await readLegacySessionMetadata(sessionId)) ??
+    ({ id: sessionId } as SessionMetadata);
   const next = { ...existing, ...updates };
   await fs.writeFile(metaPath(sessionId), JSON.stringify(next, null, 2), 'utf8');
   return next;
 }
 
-export function createSessionLogWriter(sessionId: string): SessionLogWriter {
-  const stream = createWriteStream(logPath(sessionId), { flags: 'a' });
+async function readModernSessionMetadata(sessionId: string): Promise<SessionMetadata | null> {
+  try {
+    const raw = await fs.readFile(metaPath(sessionId), 'utf8');
+    const parsed = JSON.parse(raw) as SessionMetadata | StoredRunOptions;
+    if (!isSessionMetadataRecord(parsed)) {
+      return null;
+    }
+    const enriched = await attachModelRuns(parsed, sessionId);
+    return await markZombie(enriched, { persist: false });
+  } catch {
+    return null;
+  }
+}
+
+async function readLegacySessionMetadata(sessionId: string): Promise<SessionMetadata | null> {
+  try {
+    const raw = await fs.readFile(legacySessionPath(sessionId), 'utf8');
+    const parsed = JSON.parse(raw) as SessionMetadata;
+    const enriched = await attachModelRuns(parsed, sessionId);
+    return await markZombie(enriched, { persist: false });
+  } catch {
+    return null;
+  }
+}
+
+function isSessionMetadataRecord(value: unknown): value is SessionMetadata {
+  return Boolean(value && typeof (value as SessionMetadata).id === 'string' && (value as SessionMetadata).status);
+}
+
+async function attachModelRuns(meta: SessionMetadata, sessionId: string): Promise<SessionMetadata> {
+  const runs = await listModelRunFiles(sessionId);
+  if (runs.length === 0) {
+    return meta;
+  }
+  return { ...meta, models: runs };
+}
+
+export function createSessionLogWriter(sessionId: string, model?: string): SessionLogWriter {
+  const targetPath = model ? modelLogPath(sessionId, model) : logPath(sessionId);
+  if (model) {
+    void ensureDir(modelsDir(sessionId));
+  }
+  const stream = createWriteStream(targetPath, { flags: 'a' });
   const logLine = (line = ''): void => {
     stream.write(`${line}\n`);
   };
@@ -278,7 +460,7 @@ export function createSessionLogWriter(sessionId: string): SessionLogWriter {
     stream.write(chunk);
     return true;
   };
-  return { stream, logLine, writeChunk, logPath: logPath(sessionId) };
+  return { stream, logLine, writeChunk, logPath: targetPath };
 }
 
 export async function listSessionsMetadata(): Promise<SessionMetadata[]> {
@@ -311,17 +493,67 @@ export function filterSessionsByRange(
 }
 
 export async function readSessionLog(sessionId: string): Promise<string> {
+  const runs = await listModelRunFiles(sessionId);
+  if (runs.length === 0) {
+    try {
+      return await fs.readFile(logPath(sessionId), 'utf8');
+    } catch {
+      return '';
+    }
+  }
+  const sections: string[] = [];
+  let hasContent = false;
+  const ordered = runs
+    .slice()
+    .sort((a, b) => (a.startedAt && b.startedAt ? a.startedAt.localeCompare(b.startedAt) : a.model.localeCompare(b.model)));
+  for (const run of ordered) {
+    const logFile =
+      run.log?.path
+        ? path.isAbsolute(run.log.path)
+          ? run.log.path
+          : path.join(sessionDir(sessionId), run.log.path)
+        : modelLogPath(sessionId, run.model);
+    let body = '';
+    try {
+      body = await fs.readFile(logFile, 'utf8');
+    } catch {
+      body = '';
+    }
+    if (body.length > 0) {
+      hasContent = true;
+    }
+    sections.push(`=== ${run.model} ===\n${body}`.trimEnd());
+  }
+  if (!hasContent) {
+    try {
+      return await fs.readFile(logPath(sessionId), 'utf8');
+    } catch {
+      // ignore and return structured header-only log
+    }
+  }
+  return sections.join('\n\n');
+}
+
+export async function readModelLog(sessionId: string, model: string): Promise<string> {
   try {
-    return await fs.readFile(logPath(sessionId), 'utf8');
+    return await fs.readFile(modelLogPath(sessionId, model), 'utf8');
   } catch {
     return '';
   }
 }
 
 export async function readSessionRequest(sessionId: string): Promise<StoredRunOptions | null> {
+  const modern = await readModernSessionMetadata(sessionId);
+  if (modern?.options) {
+    return modern.options;
+  }
   try {
     const raw = await fs.readFile(requestPath(sessionId), 'utf8');
-    return JSON.parse(raw) as StoredRunOptions;
+    const parsed = JSON.parse(raw);
+    if (isSessionMetadataRecord(parsed)) {
+      return parsed.options ?? null;
+    }
+    return parsed as StoredRunOptions;
   } catch {
     return null;
   }
@@ -385,7 +617,7 @@ export async function getSessionPaths(sessionId: string): Promise<{
   const log = logPath(sessionId);
   const request = requestPath(sessionId);
 
-  const required = [metadata, log, request];
+  const required = [metadata, log];
   const missing: string[] = [];
   for (const file of required) {
     if (!(await fileExists(file))) {
@@ -396,7 +628,6 @@ export async function getSessionPaths(sessionId: string): Promise<{
   if (missing.length > 0) {
     throw new Error(`Session "${sessionId}" is missing: ${missing.join(', ')}`);
   }
-
   return { dir, metadata, log, request };
 }
 

@@ -84,7 +84,7 @@ This mirrors Mario Zechner’s “What if you don’t need MCP?” technique and
 ## Post-Run Validation
 
 - `oracle session <id>` should replay the transcript with markdown.
-- `~/.oracle/sessions/<id>/session.json` must include `browser.config` metadata (model label, cookie settings) and `browser.runtime` (PID/port).
+- `~/.oracle/sessions/<id>/meta.json` must include `browser.config` metadata (model label, cookie settings) and `browser.runtime` (PID/port).
 
 Document results (pass/fail, session IDs) in PR descriptions so reviewers can audit real-world behavior.
 
