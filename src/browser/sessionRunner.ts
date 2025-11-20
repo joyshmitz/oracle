@@ -67,10 +67,10 @@ export async function runBrowserSessionExecution(
       log(chalk.dim('[verbose] Browser inline file fallback enabled (pasting file contents).'));
     }
   }
-  const headerLine = `launching browser mode (${runOptions.model}) with ~${promptArtifacts.estimatedInputTokens.toLocaleString()} tokens`;
   if (promptArtifacts.bundled) {
-    log(chalk.dim(`[browser] Packed ${promptArtifacts.bundled.originalCount} files into 1 bundle.`));
+    log(chalk.dim(`Packed ${promptArtifacts.bundled.originalCount} files into 1 bundle (contents counted in token estimate).`));
   }
+  const headerLine = `Launching browser mode (${runOptions.model}) with ~${promptArtifacts.estimatedInputTokens.toLocaleString()} tokens.`;
   const automationLogger: BrowserLogger = ((message?: string) => {
     if (!runOptions.verbose) return;
     if (typeof message === 'string') {

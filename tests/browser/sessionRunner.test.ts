@@ -72,7 +72,7 @@ describe('runBrowserSessionExecution', () => {
         },
       },
     );
-    expect(log.mock.calls.some((call) => /launching browser mode/.test(String(call[0])))).toBe(true);
+    expect(log.mock.calls.some((call) => /Launching browser mode/.test(String(call[0])))).toBe(true);
     expect(log.mock.calls.some((call) => /Prompt textarea ready/.test(String(call[0])))).toBe(false);
     expect(noisyLogger).toHaveBeenCalled(); // ensure executeBrowser ran
   });
