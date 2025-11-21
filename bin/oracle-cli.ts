@@ -381,7 +381,7 @@ Examples:
     --file "src/**/*.ts" --file "!src/**/*.test.ts"
 
   # Build, print, and copy a markdown bundle (semi-manual)
-  oracle --render --copy -p "Summarize the risk register" --file docs/risk-register.md docs/risk-matrix.md
+  oracle --render --copy -p "Review the TS data layer" --file "src/**/*.ts" --file "!src/**/*.test.ts"
 `,
 );
 
