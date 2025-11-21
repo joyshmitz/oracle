@@ -50,7 +50,7 @@ export async function runMultiModelApiSession(
   params: MultiModelRunParams,
   deps: MultiModelRunDependencies = defaultDeps,
 ): Promise<MultiModelRunSummary> {
-  const { sessionMeta, runOptions, models, cwd, version } = params;
+  const { sessionMeta, runOptions, models, cwd } = params;
   const store = deps.store ?? sessionStore;
   const runOracleImpl = deps.runOracleImpl ?? runOracle;
   const now = deps.now ?? (() => Date.now());
@@ -62,7 +62,6 @@ export async function runMultiModelApiSession(
       runOptions,
       model,
       cwd,
-      version,
       store,
       runOracleImpl,
     }),
@@ -91,7 +90,6 @@ function startModelExecution({
   runOptions,
   model,
   cwd,
-  version,
   store,
   runOracleImpl,
 }: {
@@ -99,7 +97,6 @@ function startModelExecution({
   runOptions: RunOracleOptions;
   model: ModelName;
   cwd: string;
-  version: string;
   store: SessionStore;
   runOracleImpl: typeof runOracle;
 }): { model: ModelName; promise: Promise<ModelExecutionResult> } {
@@ -124,9 +121,8 @@ function startModelExecution({
       queuedAt: new Date().toISOString(),
       startedAt: new Date().toISOString(),
     });
-    perModelLog(`oracle (${version}) summons ${model}`);
     const result = await runOracleImpl(
-      { ...perModelOptions, effectiveModelId: model },
+      { ...perModelOptions, effectiveModelId: model, suppressHeader: true },
       {
         cwd,
         log: perModelLog,

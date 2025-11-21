@@ -190,7 +190,9 @@ export async function runOracle(options: RunOracleOptions, deps: RunOracleDeps =
   const shouldReportFiles =
     (options.filesReport || fileTokenInfo.totalTokens > inputTokenBudget) && fileTokenInfo.stats.length > 0;
   if (!isPreview) {
-    log(headerLine);
+    if (!options.suppressHeader) {
+      log(headerLine);
+    }
     const maskedKey = maskApiKey(apiKey);
     if (maskedKey) {
       const resolvedSuffix =

@@ -124,6 +124,8 @@ export interface RunOracleOptions {
   timeoutSeconds?: number | 'auto';
   /** Render plain text instead of ANSI-rendered markdown when printing answers to a rich TTY. */
   renderPlain?: boolean;
+  /** Suppress the per-run header log line (used for multi-model logs where a model header is already printed). */
+  suppressHeader?: boolean;
 }
 
 export interface UsageSummary {
