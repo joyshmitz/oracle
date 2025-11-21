@@ -55,7 +55,7 @@ Engine auto-picks API when `OPENAI_API_KEY` is set, otherwise browser; browser i
   - Oracle bundles a prompt plus the right files so another AI (GPT 5 Pro + more) can answer. Use when stuck/bugs/reviewing.
   - Run `npx -y @steipete/oracle --help` once per session before first use.
   ```
-- Tip: set `chatgptUrl` in config (or `--chatgpt-url`) to a dedicated ChatGPT project folder so work runs don’t clutter your main history.
+- Tip: set `browser.chatgptUrl` in config (or `--chatgpt-url`) to a dedicated ChatGPT project folder so browser runs don’t clutter your main history.
 
 **MCP**
 - Run the stdio server via `oracle-mcp`.
@@ -116,9 +116,12 @@ Put defaults in `~/.oracle/config.json` (JSON5). Example:
   model: "gpt-5.1-pro",
   engine: "api",
   filesReport: true,
-  chatgptUrl: "https://chatgpt.com/g/g-p-691edc9fec088191b553a35093da1ea8-oracle/project"
+  browser: {
+    chatgptUrl: "https://chatgpt.com/g/g-p-691edc9fec088191b553a35093da1ea8-oracle/project"
+  }
 }
 ```
+Use `browser.chatgptUrl` (or the legacy alias `browser.url`) to target a specific ChatGPT workspace/folder for browser automation.
 See [docs/configuration.md](docs/configuration.md) for precedence and full schema.
 
 Advanced flags
