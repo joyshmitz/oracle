@@ -15,7 +15,17 @@ describe('oracle-mcp schemas', () => {
   });
 
   beforeAll(async () => {
-    await client.connect(transport);
+    let lastError: unknown;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        await client.connect(transport);
+        return;
+      } catch (error) {
+        lastError = error;
+        await new Promise((resolve) => setTimeout(resolve, 200));
+      }
+    }
+    throw lastError;
   }, 15_000);
 
   afterAll(async () => {
