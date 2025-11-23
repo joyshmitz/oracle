@@ -1,4 +1,7 @@
 import { describe, test, expect } from 'vitest';
+import fs from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 import { runOracle, extractTextOutput } from '../../src/oracle.js';
 import { runMultiModelApiSession } from '../../src/oracle/multiModelRunner.js';
 import { sessionStore } from '../../src/sessionStore.js';
@@ -87,6 +90,105 @@ async function loadCatalog(): Promise<Set<string>> {
       summary.fulfilled.forEach((entry) => {
         expect(entry.answerText.toLowerCase()).toContain('mixed multi ok');
       });
+    },
+    240_000,
+  );
+});
+
+(shouldRunOpenRouter ? describe : describe.skip)('Additional OpenRouter models', () => {
+  const expectTokens = (usage?: { inputTokens?: number; totalTokens?: number }) => {
+    expect((usage?.inputTokens ?? 0)).toBeGreaterThan(0);
+    expect((usage?.totalTokens ?? 0)).toBeGreaterThanOrEqual(usage?.inputTokens ?? 0);
+  };
+
+  test(
+    'deepseek/deepseek-chat-v3.1 returns tokens',
+    async () => {
+      const catalog = await loadCatalog();
+      const modelId = 'deepseek/deepseek-chat-v3.1';
+      if (!catalog.has(modelId)) {
+        console.warn(`Skipping OpenRouter deepseek test; ${modelId} not available for this key.`);
+        return;
+      }
+      const result = await runOracle(
+        {
+          prompt: 'Reply with "deepseek ok" exactly.',
+          model: modelId,
+          silent: true,
+          background: false,
+          search: false,
+          maxOutput: 32,
+        },
+        { log: () => {}, write: () => true },
+      );
+      if (result.mode !== 'live') throw new Error('expected live');
+      const text = extractTextOutput(result.response).toLowerCase();
+      expect(text).toContain('deepseek ok');
+      expectTokens(result.usage);
+    },
+    180_000,
+  );
+
+  test(
+    'z-ai/glm-4.6 returns tokens',
+    async () => {
+      const catalog = await loadCatalog();
+      const modelId = 'z-ai/glm-4.6';
+      if (!catalog.has(modelId)) {
+        console.warn(`Skipping OpenRouter glm test; ${modelId} not available for this key.`);
+        return;
+      }
+      const result = await runOracle(
+        {
+          prompt: 'Reply "glm ok" exactly.',
+          model: modelId,
+          silent: true,
+          background: false,
+          search: false,
+          maxOutput: 32,
+        },
+        { log: () => {}, write: () => true },
+      );
+      if (result.mode !== 'live') throw new Error('expected live');
+      const text = extractTextOutput(result.response).toLowerCase();
+      expect(text).toContain('glm ok');
+      expectTokens(result.usage);
+    },
+    180_000,
+  );
+
+  test(
+    'kwaipilot/kat-coder-pro:free handles attached file',
+    async () => {
+      const catalog = await loadCatalog();
+      const modelId = 'kwaipilot/kat-coder-pro:free';
+      if (!catalog.has(modelId)) {
+        console.warn(`Skipping OpenRouter kat-coder test; ${modelId} not available for this key.`);
+        return;
+      }
+      const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'oracle-kat-coder-'));
+      const filePath = path.join(tmpDir, 'snippet.txt');
+      await fs.writeFile(
+        filePath,
+        'function add(a, b) { return a + b; }\n// Explain what this does in one line.',
+        'utf8',
+      );
+      const result = await runOracle(
+        {
+          prompt: 'Read the attached code and answer with "kat coder ok" plus a 5-word summary.',
+          model: modelId,
+          file: [filePath],
+          silent: true,
+          background: false,
+          search: false,
+          maxOutput: 128,
+        },
+        { log: () => {}, write: () => true },
+      );
+      if (result.mode !== 'live') throw new Error('expected live');
+      const text = extractTextOutput(result.response).toLowerCase();
+      expect(text).toContain('kat coder ok');
+      expectTokens(result.usage);
     },
     240_000,
   );
