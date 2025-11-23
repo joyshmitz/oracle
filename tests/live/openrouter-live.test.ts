@@ -222,7 +222,7 @@ async function loadCatalog(): Promise<Set<string>> {
         return;
       }
       const prompt = 'Reply with exactly "mixed router ok"';
-      const models = ['gpt-4o-mini', 'openrouter/auto', 'grok-4.1'] as const;
+      const models = ['gpt-5.1', 'openrouter/auto', 'grok-4.1'] as const;
       await sessionStore.ensureStorage();
       const sessionMeta = await sessionStore.createSession(
         { prompt, model: models[0], models: models as unknown as string[], mode: 'api' },

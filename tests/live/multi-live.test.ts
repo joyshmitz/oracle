@@ -25,7 +25,7 @@ const CLI_ENTRY = path.join(process.cwd(), 'bin', 'oracle-cli.ts');
     'completes all providers',
     async () => {
       const prompt = 'In one concise sentence, explain photosynthesis.';
-      const models: ModelName[] = ['gpt-4o-mini', 'gemini-3-pro', 'claude-3-haiku-20240307'];
+      const models: ModelName[] = ['gpt-5.1', 'gemini-3-pro', 'claude-3-haiku-20240307'];
       const baseModel = models[0];
       await sessionStore.ensureStorage();
       const sessionMeta = await sessionStore.createSession(
@@ -72,7 +72,7 @@ const CLI_ENTRY = path.join(process.cwd(), 'bin', 'oracle-cli.ts');
             '--prompt',
             'Live shorthand multi-model prompt for cross-checking this design end-to-end.',
             '--models',
-            'gpt-4o-mini,gemini,haiku',
+            'gpt-5.1,gemini,haiku',
             '--wait',
           ],
           { env },
@@ -91,7 +91,7 @@ const CLI_ENTRY = path.join(process.cwd(), 'bin', 'oracle-cli.ts');
         (m: { model: string }) => m.model,
       );
       expect(selectedModels).toEqual(
-        expect.arrayContaining(['gpt-4o-mini', 'gemini-3-pro', 'claude-3-haiku-20240307']),
+        expect.arrayContaining(['gpt-5.1', 'gemini-3-pro', 'claude-3-haiku-20240307']),
       );
       expect(metadata.status).toBe('completed');
 
