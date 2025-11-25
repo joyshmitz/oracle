@@ -184,9 +184,11 @@ export async function runOracle(options: RunOracleOptions, deps: RunOracleDeps =
     );
   }
 
+  const resolverOpenRouterApiKey =
+    openRouterFallback || isOpenRouterBaseUrl(baseUrl) ? openRouterApiKey ?? apiKey : undefined;
   const modelConfig = await resolveModelConfig(options.model, {
     baseUrl,
-    openRouterApiKey: openRouterApiKey ?? (isOpenRouterBaseUrl(baseUrl) ? apiKey : undefined),
+    openRouterApiKey: resolverOpenRouterApiKey,
   });
   const isLongRunningModel = isProTierModel;
   const supportsBackground = modelConfig.supportsBackground !== false;
