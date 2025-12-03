@@ -129,6 +129,8 @@ export async function submitPrompt(
   }
 
   await verifyPromptCommitted(runtime, prompt, 30_000, logger);
+
+  await clickAnswerNowIfPresent(runtime, logger);
 }
 
 async function attemptSendButton(Runtime: ChromeClient['Runtime']): Promise<boolean> {
@@ -166,6 +168,41 @@ async function attemptSendButton(Runtime: ChromeClient['Runtime']): Promise<bool
     await delay(100);
   }
   return false;
+}
+
+async function clickAnswerNowIfPresent(Runtime: ChromeClient['Runtime'], logger?: BrowserLogger) {
+  const script = `(() => {
+    const matchesText = (el) => (el?.textContent || '').trim().toLowerCase() === 'answer now';
+    const candidate = Array.from(document.querySelectorAll('button,span')).find(matchesText);
+    if (!candidate) return 'missing';
+    const button = candidate.closest('button') ?? candidate;
+    const style = window.getComputedStyle(button);
+    const disabled =
+      button.hasAttribute('disabled') ||
+      button.getAttribute('aria-disabled') === 'true' ||
+      style.pointerEvents === 'none' ||
+      style.display === 'none';
+    if (disabled) return 'disabled';
+    (button).dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, cancelable: true }));
+    (button).dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+    (button).dispatchEvent(new MouseEvent('pointerup', { bubbles: true, cancelable: true }));
+    (button).dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
+    (button).dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+    return 'clicked';
+  })()`;
+
+  const deadline = Date.now() + 3_000;
+  while (Date.now() < deadline) {
+    const { result } = await Runtime.evaluate({ expression: script, returnByValue: true });
+    const status = result.value as string;
+    if (status === 'clicked') {
+      logger?.('Clicked "Answer now" gate');
+      await delay(300);
+      return;
+    }
+    if (status === 'missing') return;
+    await delay(100);
+  }
 }
 
 async function verifyPromptCommitted(
