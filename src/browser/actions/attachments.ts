@@ -34,6 +34,7 @@ export async function uploadAttachmentFile(
     await logDomFailure(runtime, logger, 'file-upload');
     throw new Error('Attachment did not register with the ChatGPT composer in time.');
   }
+  await waitForAttachmentVisible(runtime, expectedName, 10_000, logger);
   logger('Attachment queued');
 }
 
@@ -93,6 +94,35 @@ export async function waitForAttachmentCompletion(
   logger?.('Attachment upload timed out while waiting for ChatGPT composer to become ready.');
   await logDomFailure(Runtime, logger ?? (() => {}), 'file-upload-timeout');
   throw new Error('Attachments did not finish uploading before timeout.');
+}
+
+export async function waitForAttachmentVisible(
+  Runtime: ChromeClient['Runtime'],
+  expectedName: string,
+  timeoutMs: number,
+  logger?: BrowserLogger,
+): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  const expression = `(() => {
+    const expected = ${JSON.stringify(expectedName)};
+    const turns = Array.from(document.querySelectorAll('article[data-testid^="conversation-turn"]'));
+    const userTurns = turns.filter((node) => node.querySelector('[data-message-author-role="user"]'));
+    const lastUser = userTurns[userTurns.length - 1];
+    if (!lastUser) return { found: false, userTurns: userTurns.length };
+    const chips = Array.from(lastUser.querySelectorAll('a, div')).some((el) => (el.textContent || '').includes(expected));
+    return { found: chips, userTurns: userTurns.length };
+  })()`;
+  while (Date.now() < deadline) {
+    const { result } = await Runtime.evaluate({ expression, returnByValue: true });
+    const value = result?.value as { found?: boolean } | undefined;
+    if (value?.found) {
+      return;
+    }
+    await delay(200);
+  }
+  logger?.('Attachment not visible in composer; giving up.');
+  await logDomFailure(Runtime, logger ?? (() => {}), 'attachment-visible');
+  throw new Error('Attachment did not appear in ChatGPT composer.');
 }
 
 async function waitForAttachmentSelection(

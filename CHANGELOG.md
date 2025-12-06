@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## Unreleased
+
+### Changed
+- Updated Inquirer to 13.x and aligned TUI prompts with `select` to stay compatible with the latest API.
+
+### Fixed
+- Browser config defaults from `~/.oracle/config.json` now apply when CLI flags are untouched (chromePath/profile/cookiePath), fixing “No Chrome installations found” when a custom browser path is configured.
+- Browser engine now verifies each attachment shows up in the composer before sending (including remote/serve uploads), fixing cases where file selection succeeded but ChatGPT never received the files (e.g., WKWebView blank runs).
+
 ## 0.5.1 — 2025-12-03
 
 ### Added
